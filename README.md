@@ -1,3 +1,7 @@
+# Description
+
+Scraper of ranobe web-site(s) written in Python and based on Selenium WebDriver and provided with minimalistic RESTful based on FastAPI framework.
+
 # TODO Research
 
 - FastApi
@@ -19,3 +23,10 @@ $ . venv/bin/activate
 make windows
 ```
 
+# Supported scraping
+
+### ranobelib.me
+
+- Info
+- Chapter list
+- Chapter
