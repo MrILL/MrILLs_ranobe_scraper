@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
+import logging
 from urllib.parse import urlparse
 import re
 
@@ -210,7 +211,14 @@ class RanobelibScraper(DomainScraper):
 
         res = dict()
 
-        res['url'] = chromeWebDriver.current_url
+        res['url'] = url
+        
+        pathname = urlparse(url).path
+        findVolChapRegex = '^\/[a-z\-]+\/v(\d+)\/c(\d+)'
+        [volume, nomer] = re.fullmatch(findVolChapRegex, pathname).groups()
+        res['volume'] = volume
+        res['nomer'] = nomer
+
         res['title'] = chromeWebDriver.find_elements(By.CLASS_NAME, 'reader-header-action')[1].find_element(By.CLASS_NAME, 'reader-header-action__text').text
         res['content'] = chromeWebDriver.find_element(By.CLASS_NAME, 'reader-container').get_attribute('outerHTML')
 
@@ -224,7 +232,6 @@ class RanobelibScraper(DomainScraper):
         setLink(res, 'next', prevNextLinks[1])
 
         return res
-
 
 class RanobehubScraper(DomainScraper):
     def __init__(self) -> None:
@@ -301,6 +308,7 @@ scraper = Scraper(chromeWebDriver)
 
 app = FastAPI()
 
+logger = logging.getLogger(__name__)
 
 class UrlPayload(BaseModel):
     url: HttpUrl
@@ -308,6 +316,7 @@ class UrlPayload(BaseModel):
 @app.post('/info/scrape')
 def scrapeInfo(payload: UrlPayload):
     url = payload.url
+    logger.info(f'Scraping info page: {url}')
     
     if not scraper.isSupported(url):
         raise HTTPException(501, 'Not supported domain')
@@ -322,6 +331,7 @@ def scrapeInfo(payload: UrlPayload):
 @app.post('/chapters-list/scrape')
 def scrapeChapter(payload: UrlPayload):
     url = payload.url
+    logger.info(f'Scraping chapters list page: {url}')
     
     if not scraper.isSupported(url):
         raise HTTPException(501, 'Not supported domain')
@@ -336,6 +346,7 @@ def scrapeChapter(payload: UrlPayload):
 @app.post('/chapter/scrape')
 def scrapeChapter(payload: UrlPayload):
     url = payload.url
+    logger.info(f'Scraping chapter page: {url}')
     
     if not scraper.isSupported(url):
         raise HTTPException(501, 'Not supported domain')
@@ -346,9 +357,3 @@ def scrapeChapter(payload: UrlPayload):
     chapter = scraper.scrapeChapter(url)
     
     return chapter
-
-# @app.route('/chapter/scrape', methods=['POST'])
-# def scrapeList():
-#     # TODO
-
-#     return {}
