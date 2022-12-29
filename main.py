@@ -163,27 +163,27 @@ class RanobelibScraper(DomainScraper):
 
         webDriver.get(url)
 
-        tabs = chromeWebDriver.find_element(By.CLASS_NAME, 'tabs__list')
+        tabs = webDriver.find_element(By.CLASS_NAME, 'tabs__list')
         tabs.find_element(By.XPATH, "./li[@data-key='chapters']").click()
-        chromeWebDriver.implicitly_wait(0.6)
+        webDriver.implicitly_wait(0.6)
 
         # TODO choose translator
 
         chapters_collection = dict()
 
-        document_height = WebDriverScrollingUtils.getDocumentScrollHeight(chromeWebDriver)
-        client_height = WebDriverScrollingUtils.getDocumentClientHeight(chromeWebDriver)
+        document_height = WebDriverScrollingUtils.getDocumentScrollHeight(webDriver)
+        client_height = WebDriverScrollingUtils.getDocumentClientHeight(webDriver)
         while True:
-            scraped_chapters = RanobelibScraper._scrape_cur_recycler(chromeWebDriver)
+            scraped_chapters = RanobelibScraper._scrape_cur_recycler(webDriver)
             for scraped_chapter in scraped_chapters:
                 id = scraped_chapter['id']
                 chapter = scraped_chapter['chapter']
                 if chapter['title'] is not '':
                     chapters_collection[id] = chapter
 
-            WebDriverScrollingUtils.documentScrollBy(chromeWebDriver, 0, client_height)
-            chromeWebDriver.implicitly_wait(0.2)
-            current_scroll = WebDriverScrollingUtils.getDocumentScrollTop(chromeWebDriver)
+            WebDriverScrollingUtils.documentScrollBy(webDriver, 0, client_height)
+            webDriver.implicitly_wait(0.2)
+            current_scroll = WebDriverScrollingUtils.getDocumentScrollTop(webDriver)
             if current_scroll >= document_height - client_height:
                 break
         chapters = list(chapters_collection.values())
@@ -219,10 +219,10 @@ class RanobelibScraper(DomainScraper):
         res['volume'] = volume
         res['nomer'] = nomer
 
-        res['title'] = chromeWebDriver.find_elements(By.CLASS_NAME, 'reader-header-action')[1].find_element(By.CLASS_NAME, 'reader-header-action__text').text
-        res['content'] = chromeWebDriver.find_element(By.CLASS_NAME, 'reader-container').get_attribute('outerHTML')
+        res['title'] = webDriver.find_elements(By.CLASS_NAME, 'reader-header-action')[1].find_element(By.CLASS_NAME, 'reader-header-action__text').text
+        res['content'] = webDriver.find_element(By.CLASS_NAME, 'reader-container').get_attribute('outerHTML')
 
-        prevNextLinks = chromeWebDriver.find_element(By.CLASS_NAME, 'reader-header-actions').find_elements(By.TAG_NAME, 'a')
+        prevNextLinks = webDriver.find_element(By.CLASS_NAME, 'reader-header-actions').find_elements(By.TAG_NAME, 'a')
         def setLink(obj: dict, key: str, elem: WebElement):
             if elem.get_attribute('data-disabled') == '':
                 obj[key] = None
@@ -303,12 +303,24 @@ class Scraper:
     
 
 
-chromeWebDriver = uc.Chrome(headless=True)
-scraper = Scraper(chromeWebDriver)
-
 app = FastAPI()
 
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+def onStart():
+    global scraper
+    global chromeWebDriver
+    chromeWebDriver = uc.Chrome(headless=False)
+    scraper = Scraper(chromeWebDriver)
+
+# Not working with --reload option of uvicorn, but here related issues:
+# 1. https://github.com/tiangolo/fastapi/issues/1937
+# 2. https://github.com/tiangolo/fastapi/issues/5383
+# 3. https://github.com/tiangolo/fastapi/issues/5072
+@app.on_event("shutdown")
+def onDown():
+    chromeWebDriver.quit()
 
 class UrlPayload(BaseModel):
     url: HttpUrl
