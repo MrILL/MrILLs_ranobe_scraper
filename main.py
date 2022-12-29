@@ -44,6 +44,10 @@ class DomainScraper:
     def scrapeChaptersList(webDriver: WebDriver, url: str) -> any:
         return None
 
+    # Starting point is info page
+    def scrapeInfoWithList(webDriver: WebDriver, url: str) -> any:
+        return None
+
     def isPageChapter(url: str) -> bool:
         return False
     
@@ -159,7 +163,7 @@ class RanobelibScraper(DomainScraper):
     # TODO add return type for chapters list
     def scrapeChaptersList(webDriver: WebDriver, url: str) -> any:
         if not RanobelibScraper.isPageChaptersList(url):
-            raise Exception('Page is not available for scraping chapter list for this domain')
+            raise Exception('Page is not available for scraping chapters list for this domain')
 
         webDriver.get(url)
 
@@ -191,6 +195,22 @@ class RanobelibScraper(DomainScraper):
         res = dict()
         res['url'] = webDriver.current_url
         res['chapters'] = chapters
+
+        return res
+
+    def _goToChaptersFromInfo(webDriver: WebDriver) -> None:
+        # in this domain info placed on the same page as chapters
+        webDriver.find_element(By.XPATH, '//li[2]').click()
+        return
+
+    def scrapeInfoWithList(webDriver: WebDriver, url: str) -> any:
+        if not RanobelibScraper.isPageInfo(url):
+            raise Exception('Page is not available for scraping info with chapters list for this domain')
+
+        res = dict()
+        res['info'] = RanobelibScraper.scrapeInfo(webDriver, url)
+        RanobelibScraper._goToChaptersFromInfo(webDriver)
+        res['chapters_list'] = RanobelibScraper.scrapeChaptersList(webDriver, webDriver.current_url)
 
         return res
 
@@ -289,6 +309,13 @@ class Scraper:
 
         return scraper.scrapeChaptersList(self.webDriver, url)
 
+    def scrapeInfoWithList(self, url: str) -> any:
+        scraper = self.getDomainScraper(url)
+        if not scraper.isPageInfo(url):
+            raise Exception('Page is not info page')
+        
+        return scraper.scrapeInfoWithList(self.webDriver, url)
+
     def isPageChapter(self, url: str) -> bool:
         scraper = self.getDomainScraper(url)
 
@@ -300,7 +327,7 @@ class Scraper:
             raise Exception('Page is not chapter')
 
         return scraper.scrapeChapter(self.webDriver, url)
-    
+
 
 
 app = FastAPI()
@@ -324,6 +351,20 @@ def onDown():
 
 class UrlPayload(BaseModel):
     url: HttpUrl
+
+@app.post('/ranobe/scrape')
+def scrapeInfoWithList(payload: UrlPayload):
+    url = payload.url
+    logger.info(f'Scraping info with chapters list: {url}')
+
+    if not scraper.isSupported(url):
+        raise HTTPException(501, 'Not supported domain')
+    if not scraper.isPageInfo(url):
+        raise HTTPException(400, 'Page is not starting point for scraping ranobe. Accesible will be ranobe info page')
+
+    infoWithList = scraper.scrapeInfoWithList(url)
+
+    return infoWithList
 
 @app.post('/info/scrape')
 def scrapeInfo(payload: UrlPayload):
